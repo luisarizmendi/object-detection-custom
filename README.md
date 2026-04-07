@@ -291,13 +291,13 @@ With `VERBOSE_STATS=1` you'll see lines like:
 | Variable | Default | Description |
 |---|---|---|
 | `CAMERA_DEVICE` | auto | `/dev/videoN`; auto-detects if unset |
-| `CAM_TARGET_FPS` | 15 | Desired FPS — used for mode selection |
+| `CAM_TARGET_FPS` | 30 | Desired FPS — used for mode selection |
 | `CAM_FRAMERATE` | auto | Override FPS passed to v4l2 |
 | `CAM_RESOLUTION` | auto | Override resolution e.g. `1280x720` |
 | `CAM_FORMAT` | auto | Force `MJPG` or `YUYV` |
 | `DEVICE_PROBE_TIMEOUT` | 5 | Seconds per ffmpeg probe attempt |
 | `VID_DIR` | /videos | Directory with fallback video files |
-| `CAMERA_RETRY_INTERVAL` | 15 | Seconds between camera re-probe attempts while in video fallback |
+| `CAMERA_RETRY_INTERVAL` | 30 | Seconds between camera re-probe attempts while in video fallback |
 | `SHM_FRAME_NAME` | camera_frame | SHM slot name |
 | `SHM_MAX_FRAME_BYTES` | 26542080 | Max frame buffer size (default: 4K raw) |
 | `VIEWER_JPEG_QUALITY` | 0 | JPEG quality in SHM (0 = raw BGR) |
@@ -315,7 +315,7 @@ With `VERBOSE_STATS=1` you'll see lines like:
 | `INFERENCE_WIDTH/HEIGHT` | 640 | Input resolution |
 | `CONFIDENCE_THRESH` | 0.4 | Minimum confidence |
 | `NMS_THRESH` | 0.45 | NMS IoU threshold |
-| `TARGET_FPS` | 15 | Max inference rate |
+| `TARGET_FPS` | 30 | Max inference rate |
 | `EXECUTION_PROVIDER` | auto | ONNX EP (auto = TRT→CUDA→CPU) |
 | `TRT_FP16` | 1 | TensorRT FP16 mode |
 | `CLASS_NAMES` | — | Comma-separated class names |

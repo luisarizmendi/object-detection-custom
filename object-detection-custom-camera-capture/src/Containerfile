@@ -13,7 +13,7 @@ COPY capture.py shm_frame.py ./
 
 RUN mkdir -p /videos
 
-ENV CAM_TARGET_FPS=15
+ENV CAM_TARGET_FPS=30
 ENV DEVICE_PROBE_TIMEOUT=5
 ENV VID_DIR=/videos
 ENV SHM_FRAME_NAME=camera_frame

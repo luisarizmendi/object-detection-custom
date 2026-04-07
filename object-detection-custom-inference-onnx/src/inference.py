@@ -49,7 +49,7 @@ INFERENCE_WIDTH     Input width        (default: 640)
 INFERENCE_HEIGHT    Input height       (default: 640)
 CONFIDENCE_THRESH   Min confidence     (default: 0.4)
 NMS_THRESH          NMS IoU threshold  (default: 0.45)  [classic format only]
-TARGET_FPS          Max inference FPS  (default: 15)
+TARGET_FPS          Max inference FPS  (default: 30)
 EXECUTION_PROVIDER  onnxruntime EP: CPUExecutionProvider |
                     CUDAExecutionProvider |
                     TensorrtExecutionProvider |
@@ -81,7 +81,7 @@ INF_W       = int(os.environ.get("INFERENCE_WIDTH",  "640"))
 INF_H       = int(os.environ.get("INFERENCE_HEIGHT", "640"))
 CONF_THRESH = float(os.environ.get("CONFIDENCE_THRESH", "0.4"))
 NMS_THRESH  = float(os.environ.get("NMS_THRESH",        "0.45"))
-TARGET_FPS  = float(os.environ.get("TARGET_FPS",        "15"))
+TARGET_FPS  = float(os.environ.get("TARGET_FPS",        "30"))
 EP          = os.environ.get("EXECUTION_PROVIDER",  "auto")
 LOG_LEVEL   = os.environ.get("LOG_LEVEL", "INFO").upper()
 # ─────────────────────────────────────────────────────────────────────────────

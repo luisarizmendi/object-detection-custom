@@ -19,7 +19,7 @@ inference containers can read them with zero copies.
 Environment variables
 ---------------------
 CAMERA_DEVICE        Force a specific /dev/videoN (default: auto-detect)
-CAM_TARGET_FPS       Desired FPS for mode selection (default: 15)
+CAM_TARGET_FPS       Desired FPS for mode selection (default: 30)
 CAM_FRAMERATE        Override FPS to pass to v4l2 (default: auto from v4l2-ctl)
 CAM_RESOLUTION       Override resolution WxH, e.g. 1280x720 (default: auto)
 CAM_FORMAT           Force pixel format: MJPG | YUYV (default: auto)
@@ -50,7 +50,7 @@ from shm_frame import ShmFrameWriter
 
 # ── Config ────────────────────────────────────────────────────────────────────
 CAMERA_DEVICE        = os.environ.get("CAMERA_DEVICE", "")
-CAM_TARGET_FPS       = int(os.environ.get("CAM_TARGET_FPS", "15"))
+CAM_TARGET_FPS       = int(os.environ.get("CAM_TARGET_FPS", "30"))
 CAM_FRAMERATE        = os.environ.get("CAM_FRAMERATE", "")     # "" = use detected
 CAM_RESOLUTION       = os.environ.get("CAM_RESOLUTION", "")   # "" = use detected
 CAM_FORMAT           = os.environ.get("CAM_FORMAT", "")        # "" = auto
