@@ -60,15 +60,15 @@ services:
       # Video file fallback — used automatically when no camera is detected:
       - ../../videos:/videos:ro
     devices:
+      - /dev/video0
       - /dev/video1
-      # - /dev/video0
     group_add:
       - video
     security_opt:
       - label=disable
     environment:
       # CAMERA_DEVICE: "/dev/video0"   # force device; auto-detect if unset
-      CAM_TARGET_FPS: "15"
+      CAM_TARGET_FPS: "30"
       # CAM_FRAMERATE:  ""             # override detected fps
       # CAM_RESOLUTION: "1280x720"     # override resolution
       # CAM_FORMAT: ""                 # force MJPG or YUYV
@@ -116,7 +116,7 @@ services:
       INFERENCE_HEIGHT:   "640"
       CONFIDENCE_THRESH:  "0.4"
       NMS_THRESH:         "0.45"
-      TARGET_FPS:         "15"
+      TARGET_FPS:         "30"
       EXECUTION_PROVIDER: "auto"   # TensorRT EP → CUDA EP → CPU (auto-select)
       LOG_LEVEL:          "INFO"
       # CLASS_NAMES: "person,bicycle,car,motorcycle,bus,truck"
@@ -154,7 +154,7 @@ services:
       INFERENCE_HEIGHT:  "640"
       CONFIDENCE_THRESH: "0.4"
       NMS_THRESH:        "0.45"
-      TARGET_FPS:        "15"
+      TARGET_FPS:        "30"
       TRT_FP16:          "1"
       LOG_LEVEL:         "INFO"
     depends_on:
@@ -191,7 +191,7 @@ services:
       INFERENCE_HEIGHT:  "640"
       CONFIDENCE_THRESH: "0.4"
       NMS_THRESH:        "0.45"
-      TARGET_FPS:        "15"
+      TARGET_FPS:        "30"
       TRT_FP16:          "1"
       LOG_LEVEL:         "INFO"
     depends_on:
