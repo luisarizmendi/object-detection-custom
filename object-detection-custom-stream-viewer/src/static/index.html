@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Camera Inference Viewer</title>
+<style>
+/* ── brand tokens ────────────────────────────────────────────────── */
+:root {
+  --rh-red:        #ee0000;
+  --rh-red-dark:   #a30000;
+  --rh-red-dim:    #3d0000;
+  --rh-red-faint:  #1a0000;
+  --rh-white:      #ffffff;
+  --rh-black:      #151515;
+  --rh-gray-900:   #1b1b1b;
+  --rh-gray-800:   #212427;
+  --rh-gray-700:   #3c3f42;
+  --rh-gray-500:   #6a6e73;
+  --rh-gray-300:   #b8bbbe;
+  --rh-gray-100:   #e0e0e0;
+  --rh-blue:       #06c;
+  --rh-cyan:       #009596;
+  --rh-green:      #3e8635;
+  --rh-orange:     #ec7a08;
+  --accent:        var(--rh-red);
+}
+
+*{margin:0;padding:0;box-sizing:border-box}
+
+body{
+  background:var(--rh-black);
+  color:var(--rh-gray-100);
+  font-family:'Display','Segoe UI',system-ui,sans-serif;
+  height:100vh;display:flex;flex-direction:column;overflow:hidden
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+header{
+  padding:0 16px;height:48px;
+  background:var(--rh-gray-900);
+  border-bottom:2px solid var(--rh-red);
+  display:flex;align-items:center;gap:14px;flex-shrink:0
+}
+
+.rh-logo{
+  width:32px;height:32px;flex-shrink:0;
+}
+
+header h1{
+  font-size:.95rem;font-weight:700;
+  color:var(--rh-white);letter-spacing:.02em
+}
+header h1 span{color:var(--rh-red)}
+
+.badges{display:flex;gap:8px;margin-left:auto;align-items:center}
+
+/* Status badges — keep original green/amber/red semantics */
+.badge{
+  font-size:.67rem;padding:2px 9px;border-radius:10px;
+  font-weight:700;letter-spacing:.04em;white-space:nowrap
+}
+.ok  {background:#1a3a1a;color:#4caf50;border:1px solid #2e5f2e}
+.warn{background:#3a2a00;color:#ffb300;border:1px solid #5c4400}
+.err {background:#3a1a1a;color:#ef5350;border:1px solid #5c2a2a}
+
+/* ── Layout ─────────────────────────────────────────────────────────────── */
+.main{flex:1;display:flex;gap:10px;padding:10px;min-height:0}
+
+.canvas-wrap{
+  flex:1;position:relative;
+  background:#000;border-radius:6px;overflow:hidden;min-width:0;
+  border:1px solid var(--rh-gray-700)
+}
+canvas{position:absolute;top:0;left:0;width:100%;height:100%;display:block}
+#canvasVideo  {z-index:1}
+#canvasOverlay{z-index:2;pointer-events:none}
+
+/* ── Sidebar ─────────────────────────────────────────────────────────────── */
+.sidebar{
+  width:268px;flex-shrink:0;
+  display:flex;flex-direction:column;gap:8px;overflow-y:auto
+}
+
+.card{
+  background:var(--rh-gray-900);
+  border:1px solid var(--rh-gray-700);
+  border-radius:6px;padding:12px
+}
+.card h2{
+  font-size:.68rem;text-transform:uppercase;letter-spacing:.1em;
+  color:var(--rh-red);margin-bottom:9px;
+  border-bottom:1px solid var(--rh-red-dim);padding-bottom:5px
+}
+
+/* Stats */
+.stat-row{
+  display:flex;justify-content:space-between;
+  font-size:.77rem;padding:2px 0;color:var(--rh-gray-300)
+}
+.stat-val{
+  color:var(--rh-gray-100);font-variant-numeric:tabular-nums;
+  font-weight:600
+}
+
+/* Detections */
+.det-list{
+  display:flex;flex-direction:column;gap:4px;
+  max-height:300px;overflow-y:auto
+}
+.det-item{
+  background:var(--rh-gray-800);border-radius:4px;
+  padding:6px 8px;font-size:.74rem;
+  border-left:3px solid var(--rh-red)
+}
+.det-label{font-weight:700;color:var(--rh-white)}
+.det-conf {color:var(--rh-gray-500);margin-left:5px}
+.det-bbox {color:var(--rh-gray-500);font-size:.65rem;margin-top:2px}
+.no-det  {color:var(--rh-gray-700);font-size:.75rem;
+           text-align:center;padding:14px}
+
+/* Controls */
+.cfg-row{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:7px;font-size:.76rem;color:var(--rh-gray-300)
+}
+input[type=range]{
+  width:96px;accent-color:var(--rh-red);cursor:pointer
+}
+input[type=checkbox]{accent-color:var(--rh-red)}
+.cfg-val{font-size:.7rem;color:var(--rh-gray-300);min-width:28px;text-align:right}
+
+/* JSON box */
+.json-box{
+  background:var(--rh-black);border:1px solid var(--rh-gray-700);
+  border-radius:4px;padding:6px;
+  font-family:'Courier New',monospace;font-size:.63rem;
+  color:#f0ab00;  /* Gold for code */
+  max-height:200px;overflow-y:auto;word-break:break-all;white-space:pre-wrap
+}
+
+/* Source indicator bar */
+.source-bar{
+  font-size:.68rem;padding:2px 10px;
+  background:var(--rh-red-dim);color:var(--rh-gray-300);
+  border-radius:3px;letter-spacing:.03em
+}
+
+@media(max-width:680px){.sidebar{display:none}}
+</style>
+</head>
+<body>
+
+<header>
+  <svg class="rh-logo" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="16" cy="10" r="6" fill="#ee0000"/>
+    <ellipse cx="16" cy="26" rx="11" ry="6" fill="#ee0000"/>
+    <ellipse cx="16" cy="26" rx="7"  ry="3.5" fill="#a30000"/>
+    <circle  cx="16" cy="10" r="3.5" fill="#a30000"/>
+  </svg>
+
+  <h1><span>Camera Inference Viewer</span></h1>
+
+  <div class="badges">
+    <span class="badge warn" id="badgeWS">WS ●</span>
+    <span class="badge warn" id="badgeFrame">Frame —</span>
+    <span class="badge warn" id="badgeInfer">Inference —</span>
+  </div>
+</header>
+
+<div class="main">
+  <!-- Canvas area -->
+  <div class="canvas-wrap" id="canvasWrap">
+    <canvas id="canvasVideo"></canvas>
+    <canvas id="canvasOverlay"></canvas>
+  </div>
+
+  <!-- Sidebar -->
+  <div class="sidebar">
+
+    <!-- Performance -->
+    <div class="card">
+      <h2>Performance</h2>
+      <div class="stat-row"><span>Display FPS</span>
+        <span class="stat-val" id="sFps">—</span></div>
+      <div class="stat-row"><span>Infer latency</span>
+        <span class="stat-val" id="sLat">—</span></div>
+      <div class="stat-row"><span>Detections/s</span>
+        <span class="stat-val" id="sDps">0</span></div>
+      <div class="stat-row"><span>Frame seq</span>
+        <span class="stat-val" id="sSeq">—</span></div>
+      <div class="stat-row"><span>Resolution</span>
+        <span class="stat-val" id="sDim">—</span></div>
+      <div class="stat-row"><span>Model</span>
+        <span class="stat-val" id="sModel" style="font-size:.65rem">—</span></div>
+      <div class="stat-row"><span>Source</span>
+        <span class="stat-val" id="sSource">—</span></div>
+    </div>
+
+    <!-- Detections -->
+    <div class="card">
+      <h2>Detections &nbsp;<span id="detCount"
+        style="color:var(--rh-gray-500);font-weight:400">0</span></h2>
+      <div class="det-list" id="detList">
+        <div class="no-det">Waiting for inference…</div>
+      </div>
+    </div>
+
+    <!-- Display settings -->
+    <div class="card">
+      <h2>Display Settings</h2>
+      <div class="cfg-row">
+        <label>Conf threshold</label>
+        <input type="range" id="cfgConf" min="0" max="100" value="40">
+        <span class="cfg-val" id="cfgConfVal">0.40</span>
+      </div>
+      <div class="cfg-row">
+        <label>Box opacity</label>
+        <input type="range" id="cfgOpacity" min="0" max="100" value="22">
+        <span class="cfg-val" id="cfgOpacityVal">22%</span>
+      </div>
+      <div class="cfg-row">
+        <label>Label size</label>
+        <input type="range" id="cfgFont" min="8" max="24" value="13">
+        <span class="cfg-val" id="cfgFontVal">13</span>
+      </div>
+      <div class="cfg-row">
+        <label>Show JSON</label>
+        <input type="checkbox" id="cfgJson">
+      </div>
+    </div>
+
+    <!-- Raw JSON (hidden by default) -->
+    <div class="card" id="cardJson" style="display:none">
+      <h2>Last Detection JSON</h2>
+      <div class="json-box" id="jsonBox"></div>
+    </div>
+
+  </div><!-- /sidebar -->
+</div><!-- /main -->
+
+<script>
+// ── Constants ───────────────────────────────────────────────────────────────
+const WS_URL = `ws://${location.host}/ws`;
+
+const RH_PALETTE = [
+  '#ee0000','#f0ab00','#009596','#06c','#8476d1',
+  '#ec7a08','#3e8635','#c9190b','#002952','#6a6e73',
+  '#a30000','#f4c145','#73bcf7','#b8bbbe','#8481dd',
+];
+
+// ── State ────────────────────────────────────────────────────────────────────
+let lastDetections = [];
+let latencyMs      = 0;
+let model          = '—';
+let frameW = 0, frameH = 0, seqNo = 0;
+let displayFrames = 0, fpsTs = performance.now(), displayFps = 0;
+let detPerSec = 0, detAccum = 0, dpsTs = performance.now();
+
+// User prefs
+let confThresh = 0.40;
+let boxOpacity = 0.22;
+let fontSize   = 13;
+
+// ── Canvas ──────────────────────────────────────────────────────────────────
+const wrap   = document.getElementById('canvasWrap');
+const vidCv  = document.getElementById('canvasVideo');
+const ovrCv  = document.getElementById('canvasOverlay');
+const vidCtx = vidCv.getContext('2d');
+const ovrCtx = ovrCv.getContext('2d');
+
+// Stable colour per class name
+const CLASS_COLORS = {};
+function classColor(name) {
+  if (!CLASS_COLORS[name]) {
+    let h = 5381;
+    for (let i = 0; i < name.length; i++)
+      h = (((h << 5) + h) ^ name.charCodeAt(i)) >>> 0;
+    CLASS_COLORS[name] = RH_PALETTE[h % RH_PALETTE.length];
+  }
+  return CLASS_COLORS[name];
+}
+
+// ── Layout ───────────────────────────────────────────────────────────────────
+let lastLayout = null;
+
+function getLayout(fw, fh) {
+  const cw = wrap.clientWidth, ch = wrap.clientHeight;
+  if (!lastLayout || lastLayout.fw !== fw || lastLayout.fh !== fh
+      || lastLayout.cw !== cw || lastLayout.ch !== ch) {
+    const scale = Math.min(cw / fw, ch / fh);
+    const dw = Math.round(fw * scale), dh = Math.round(fh * scale);
+    const ox = Math.round((cw - dw) / 2), oy = Math.round((ch - dh) / 2);
+    [vidCv, ovrCv].forEach(c => {
+      c.width = cw; c.height = ch;
+      c.style.width = cw + 'px'; c.style.height = ch + 'px';
+    });
+    lastLayout = {fw, fh, cw, ch, scale, dw, dh, ox, oy};
+  }
+  return lastLayout;
+}
+
+new ResizeObserver(() => { lastLayout = null; }).observe(wrap);
+
+// ── Frame rendering ─────────────────────────────────────────────────────────
+function drawFrame(blob) {
+  const url = URL.createObjectURL(new Blob([blob], {type: 'image/jpeg'}));
+  const img  = new Image();
+  img.onload = () => {
+    const l = getLayout(img.naturalWidth, img.naturalHeight);
+    vidCtx.clearRect(0, 0, l.cw, l.ch);
+    vidCtx.drawImage(img, l.ox, l.oy, l.dw, l.dh);
+    URL.revokeObjectURL(url);
+
+    displayFrames++;
+    const now = performance.now();
+    if (now - fpsTs >= 1000) {
+      displayFps = displayFrames / ((now - fpsTs) / 1000);
+      displayFrames = 0;
+      fpsTs = now;
+    }
+    drawOverlay();
+  };
+  img.src = url;
+}
+
+// ── Overlay ─────────────────────────────────────────────────────────────────
+function drawOverlay() {
+  if (!frameW || !frameH) return;
+  const l = getLayout(frameW, frameH);
+  ovrCtx.clearRect(0, 0, l.cw, l.ch);
+
+  for (const d of lastDetections) {
+    if (d.confidence < confThresh) continue;
+    const b  = d.bbox;
+    const x1 = l.ox + b.x1 * l.scale;
+    const y1 = l.oy + b.y1 * l.scale;
+    const bw = b.w  * l.scale;
+    const bh = b.h  * l.scale;
+    const col = classColor(d.class_name);
+
+    // Fill
+    ovrCtx.globalAlpha = boxOpacity;
+    ovrCtx.fillStyle   = col;
+    ovrCtx.fillRect(x1, y1, bw, bh);
+
+    // Stroke
+    ovrCtx.globalAlpha = 1;
+    ovrCtx.strokeStyle = col;
+    ovrCtx.lineWidth   = 2;
+    ovrCtx.strokeRect(x1, y1, bw, bh);
+
+    const cs = Math.min(12, bw * 0.15, bh * 0.15);
+    ovrCtx.strokeStyle = '#ffffff';
+    ovrCtx.lineWidth   = 1.5;
+    [[x1, y1, 1, 1], [x1+bw, y1, -1, 1],
+     [x1, y1+bh, 1, -1], [x1+bw, y1+bh, -1, -1]].forEach(([cx,cy,sx,sy]) => {
+      ovrCtx.beginPath();
+      ovrCtx.moveTo(cx + sx*cs, cy);
+      ovrCtx.lineTo(cx, cy);
+      ovrCtx.lineTo(cx, cy + sy*cs);
+      ovrCtx.stroke();
+    });
+
+    // Label
+    const label = `${d.class_name}  ${(d.confidence * 100).toFixed(0)}%`;
+    ovrCtx.font = `700 ${fontSize}px 'Display','Segoe UI',sans-serif`;
+    const tw = ovrCtx.measureText(label).width;
+    const lh = fontSize + 7;
+    const lx = x1;
+    const ly = y1 > lh ? y1 - lh : y1 + bh;
+
+    // Label pill background
+    ovrCtx.globalAlpha = 0.92;
+    ovrCtx.fillStyle   = col;
+    roundRect(ovrCtx, lx, ly, tw + 10, lh, 3);
+    ovrCtx.fill();
+
+    // Label text
+    ovrCtx.globalAlpha = 1;
+    ovrCtx.fillStyle   = '#ffffff';
+    ovrCtx.fillText(label, lx + 5, ly + fontSize);
+  }
+  ovrCtx.globalAlpha = 1;
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+// ── Sidebar ─────────────────────────────────────────────────────────────────
+function updateSidebar(payload) {
+  document.getElementById('sLat').textContent   = `${payload.latency_ms} ms`;
+  document.getElementById('sModel').textContent = payload.model || '—';
+  document.getElementById('sDim').textContent   =
+    `${payload.frame_w}×${payload.frame_h}`;
+  document.getElementById('sSeq').textContent   = payload.seq;
+  document.getElementById('detCount').textContent = payload.detections.length;
+
+  // Detections/s
+  detAccum += payload.detections.length;
+  const now = performance.now();
+  if (now - dpsTs >= 1000) {
+    detPerSec = (detAccum / ((now - dpsTs) / 1000)).toFixed(1);
+    detAccum  = 0;
+    dpsTs     = now;
+    document.getElementById('sDps').textContent = detPerSec;
+  }
+
+  // Source hint
+  const src = payload.model || '';
+  document.getElementById('sSource').textContent =
+    src.includes('engine') ? 'TensorRT' :
+    src.includes('onnx')   ? 'ONNX Runtime' : '—';
+
+  const list = document.getElementById('detList');
+  const visible = payload.detections.filter(d => d.confidence >= confThresh);
+
+  if (visible.length === 0) {
+    list.innerHTML = '<div class="no-det">No detections</div>';
+    return;
+  }
+
+  list.innerHTML = visible.map(d => {
+    const col = classColor(d.class_name);
+    return `<div class="det-item" style="border-left-color:${col}">
+      <span class="det-label">${d.class_name}</span>
+      <span class="det-conf">${(d.confidence * 100).toFixed(1)}%</span>
+      <div class="det-bbox">
+        ${d.bbox.w.toFixed(0)}×${d.bbox.h.toFixed(0)} px
+        &nbsp;·&nbsp; cx ${d.bbox.cx.toFixed(0)}, cy ${d.bbox.cy.toFixed(0)}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Badges ───────────────────────────────────────────────────────────────────
+function setBadge(id, text, cls) {
+  const el = document.getElementById(id);
+  el.textContent = text;
+  el.className   = `badge ${cls}`;
+}
+
+// ── FPS ticker ───────────────────────────────────────────────────────────────
+setInterval(() => {
+  document.getElementById('sFps').textContent =
+    displayFps > 0 ? displayFps.toFixed(1) : '—';
+}, 500);
+
+// ── WebSocket ─────────────────────────────────────────────────────────────────
+let ws = null;
+
+function connect() {
+  setBadge('badgeWS', 'WS connecting…', 'warn');
+  ws = new WebSocket(WS_URL);
+  ws.binaryType = 'arraybuffer';
+
+  ws.onopen = () => setBadge('badgeWS', 'WS ●', 'ok');
+
+  ws.onclose = () => {
+    setBadge('badgeWS',    'WS ✕', 'err');
+    setBadge('badgeFrame', 'Frame ✕', 'err');
+    setTimeout(connect, 2000);
+  };
+
+  ws.onerror = () => setBadge('badgeWS', 'WS error', 'err');
+
+  ws.onmessage = ev => {
+    if (ev.data instanceof ArrayBuffer) {
+      setBadge('badgeFrame', 'Frame ●', 'ok');
+      drawFrame(ev.data);
+    } else {
+      try {
+        const p = JSON.parse(ev.data);
+        lastDetections = p.detections || [];
+        latencyMs = p.latency_ms || 0;
+        model     = p.model      || '—';
+        frameW    = p.frame_w    || frameW;
+        frameH    = p.frame_h    || frameH;
+        seqNo     = p.seq        || 0;
+
+        const ok = p.latency_ms !== undefined && p.latency_ms < 500;
+        setBadge('badgeInfer',
+          p.latency_ms !== undefined ? `Infer ${p.latency_ms}ms` : 'Inference —',
+          ok ? 'ok' : 'warn');
+
+        updateSidebar(p);
+        drawOverlay();
+
+        if (document.getElementById('cfgJson').checked)
+          document.getElementById('jsonBox').textContent =
+            JSON.stringify(p, null, 2);
+      } catch(e) { /* ignore parse error */ }
+    }
+  };
+}
+
+// ── Controls ─────────────────────────────────────────────────────────────────
+document.getElementById('cfgConf').addEventListener('input', function() {
+  confThresh = this.value / 100;
+  document.getElementById('cfgConfVal').textContent = confThresh.toFixed(2);
+  drawOverlay();
+  if (lastDetections.length)
+    updateSidebar({detections:lastDetections, latency_ms:latencyMs,
+                   model, frame_w:frameW, frame_h:frameH, seq:seqNo});
+});
+
+document.getElementById('cfgOpacity').addEventListener('input', function() {
+  boxOpacity = this.value / 100;
+  document.getElementById('cfgOpacityVal').textContent = this.value + '%';
+  drawOverlay();
+});
+
+document.getElementById('cfgFont').addEventListener('input', function() {
+  fontSize = parseInt(this.value);
+  document.getElementById('cfgFontVal').textContent = this.value;
+  drawOverlay();
+});
+
+document.getElementById('cfgJson').addEventListener('change', function() {
+  document.getElementById('cardJson').style.display = this.checked ? '' : 'none';
+});
+
+// ── Boot ─────────────────────────────────────────────────────────────────────
+connect();
+</script>
+</body>
+</html>

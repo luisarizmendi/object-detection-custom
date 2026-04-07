@@ -1,0 +1,223 @@
+# compose.yml — camera-inference
+#
+# Architecture:
+#
+#   USB camera (/dev/video*) — auto-detected via v4l2-ctl
+#   or video files in /videos — automatic fallback if no camera is found
+#       │  v4l2 direct (OpenCV CAP_V4L2)
+#       ▼
+#   object-detection-custom-camera-capture ──► /dev/shm/camera_frame  (POSIX shmem, raw BGR)
+#                           │
+#              ┌────────────┴────────────┐
+#              ▼                         ▼
+#   object-detection-custom-inference-onnx              object-detection-custom-inference-tensorrt[-jetson]
+#   GPU-first (CUDA EP)         TensorRT engine
+#   CPU fallback if no GPU      any NVIDIA GPU (Jetson OR desktop/server)
+#              │                         │
+#              └────────────┬────────────┘
+#                           ▼  ZeroMQ PUB tcp://5555  (JSON detections)
+#                    object-detection-custom-stream-viewer
+#                           │  WebSocket :8080
+#                        Browser
+#
+# Profiles:
+#   onnx              — ONNX Runtime (GPU if available, CPU fallback)
+#   tensorrt          — TensorRT on x86_64 or generic arm64 (nvcr.io/nvidia/tensorrt)
+#   tensorrt-jetson   — TensorRT on Jetson (JetPack 6.x, l4t base, aarch64 only)
+#
+# Quick start — ONNX (GPU if available, CPU fallback):
+#   podman compose --profile onnx up -d
+#
+# Quick start — TensorRT on desktop/server GPU (x86_64):
+#   podman compose --profile tensorrt up -d
+#
+# Quick start — TensorRT on Jetson Orin/Nano:
+#   podman compose --profile tensorrt-jetson up -d
+#
+# Video file fallback:
+#   If no usable camera is detected at startup, object-detection-custom-camera-capture automatically
+#   falls back to looping video files from VID_DIR (default: /videos).
+#   Uncomment the /videos volume below to make your video directory available.
+
+version: "3.9"
+
+services:
+
+  # ── Camera capture ──────────────────────────────────────────────────────────
+  # Reads from the first working USB camera (v4l2 auto-detect).
+  # If no usable camera is found, automatically falls back to looping video
+  # files from VID_DIR. Mount your videos directory and uncomment the volume.
+  object-detection-custom-camera-capture:
+    image: quay.io/luisarizmendi/object-detection-custom-camera-capture:latest
+    pull_policy: missing
+    #build:
+    #  context: ../../object-detection-custom-camera-capture/src
+    #  dockerfile: Containerfile
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - /dev/shm:/dev/shm
+      # Video file fallback — used automatically when no camera is detected:
+      - ../../videos:/videos:ro
+    devices:
+      - /dev/video3
+      # - /dev/video1
+    group_add:
+      - video
+    security_opt:
+      - label=disable
+    environment:
+      # CAMERA_DEVICE: "/dev/video0"   # force device; auto-detect if unset
+      CAM_TARGET_FPS: "15"
+      # CAM_FRAMERATE:  ""             # override detected fps
+      # CAM_RESOLUTION: "1280x720"     # override resolution
+      # CAM_FORMAT: ""                 # force MJPG or YUYV
+      DEVICE_PROBE_TIMEOUT: "5"
+      VID_DIR: "/videos"
+      SHM_FRAME_NAME: "camera_frame"
+      VIEWER_JPEG_QUALITY: "80"
+      LOG_LEVEL: "INFO"
+      #VERBOSE_STATS: 1
+
+  # ── ONNX inference — GPU-first, CPU fallback ──────────────────────────────
+  # Base image includes CUDA runtime. At startup, EXECUTION_PROVIDER=auto
+  # selects: TensorRT EP → CUDA EP → CPU EP (in that order).
+  # No configuration change needed when moving between GPU and CPU machines.
+  object-detection-custom-inference-onnx:
+    profiles: ["onnx"]
+    image: quay.io/luisarizmendi/object-detection-custom-inference-onnx:latest
+    pull_policy: missing
+    #build:
+    #  context: ../../object-detection-custom-inference-onnx/src
+    #  dockerfile: Containerfile
+      # Default: CUDA base + onnxruntime-gpu
+      # For pure CPU build:
+      #   args:
+      #     BASE: python:3.11-slim
+      #     ONNXRUNTIME_PKG: onnxruntime
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - /dev/shm:/dev/shm
+      # Override bundled model:
+      - ../../models:/opt/models:ro
+    security_opt:
+      - label=disable
+    # Expose GPU via CDI — works on Jetson and desktop NVIDIA:
+    devices:
+      - nvidia.com/gpu=all
+    environment:
+      SHM_FRAME_NAME:     "camera_frame"
+      ZMQ_PUB_PORT:       "5555"
+      ZMQ_TOPIC:          "detections"
+      INFERENCE_MODEL:    "model.onnx"
+      MODELS_DIR:         "/opt/models"
+      INFERENCE_WIDTH:    "640"
+      INFERENCE_HEIGHT:   "640"
+      CONFIDENCE_THRESH:  "0.4"
+      NMS_THRESH:         "0.45"
+      TARGET_FPS:         "15"
+      EXECUTION_PROVIDER: "auto"   # TensorRT EP → CUDA EP → CPU (auto-select)
+      LOG_LEVEL:          "INFO"
+      # CLASS_NAMES: "person,bicycle,car,motorcycle,bus,truck"
+    depends_on:
+      - object-detection-custom-camera-capture
+
+  # ── TensorRT inference — desktop/server GPU (x86_64 or generic arm64) ─────
+  # Uses nvcr.io/nvidia/tensorrt:24.05-py3 as base.
+  # For Jetson, use the tensorrt-jetson profile instead.
+  # .engine is built on first start (~5 min) and cached in /opt/models.
+  object-detection-custom-inference-tensorrt:
+    profiles: ["tensorrt"]
+    image: quay.io/luisarizmendi/object-detection-custom-inference-tensorrt:latest
+    pull_policy: missing
+    #build:
+    #  context: ../../object-detection-custom-inference-tensorrt/src
+    #  dockerfile: Containerfile
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - /dev/shm:/dev/shm
+      # Persist the .engine file (avoids ~5 min rebuild on every restart):
+      - ../../models:/opt/models
+    security_opt:
+      - label=disable
+    devices:
+      - nvidia.com/gpu=all
+    environment:
+      SHM_FRAME_NAME:    "camera_frame"
+      ZMQ_PUB_PORT:      "5555"
+      ZMQ_TOPIC:         "detections"
+      INFERENCE_MODEL:   "model.onnx"
+      MODELS_DIR:        "/opt/models"
+      INFERENCE_WIDTH:   "640"
+      INFERENCE_HEIGHT:  "640"
+      CONFIDENCE_THRESH: "0.4"
+      NMS_THRESH:        "0.45"
+      TARGET_FPS:        "15"
+      TRT_FP16:          "1"
+      LOG_LEVEL:         "INFO"
+    depends_on:
+      - object-detection-custom-camera-capture
+
+  # ── TensorRT inference — Jetson (JetPack 6.x, aarch64 only) ───────────────
+  # Uses nvcr.io/nvidia/l4t-tensorrt:r10.3.0-runtime as base (Tegra-optimised).
+  # FP16 enabled by default — ideal for Jetson Orin NX / AGX / Nano Super.
+  # .engine is built on first start (~5 min on Jetson) and cached in /opt/models.
+  object-detection-custom-inference-tensorrt-jetson:
+    profiles: ["tensorrt-jetson"]
+    image: quay.io/luisarizmendi/object-detection-custom-inference-tensorrt-jetson:latest
+    pull_policy: missing
+    #build:
+    #  context: ../../object-detection-custom-inference-tensorrt-jetson/src
+    #  dockerfile: Containerfile
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - /dev/shm:/dev/shm
+      # Persist the .engine file (avoids ~5 min rebuild on every restart):
+      - ../../models:/opt/models
+    security_opt:
+      - label=disable
+    devices:
+      - nvidia.com/gpu=all
+    environment:
+      SHM_FRAME_NAME:    "camera_frame"
+      ZMQ_PUB_PORT:      "5555"
+      ZMQ_TOPIC:         "detections"
+      INFERENCE_MODEL:   "model.onnx"
+      MODELS_DIR:        "/opt/models"
+      INFERENCE_WIDTH:   "640"
+      INFERENCE_HEIGHT:  "640"
+      CONFIDENCE_THRESH: "0.4"
+      NMS_THRESH:        "0.45"
+      TARGET_FPS:        "15"
+      TRT_FP16:          "1"
+      LOG_LEVEL:         "INFO"
+    depends_on:
+      - object-detection-custom-camera-capture
+
+  # ── Stream viewer ─────────────────────────────────────────────────────────
+  object-detection-custom-stream-viewer:
+    image: quay.io/luisarizmendi/object-detection-custom-stream-viewer:latest
+    pull_policy: missing
+    #build:
+    #  context: ../../object-detection-custom-stream-viewer/src
+    #  dockerfile: Containerfile
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - /dev/shm:/dev/shm
+    environment:
+      SHM_FRAME_NAME:     "camera_frame"
+      ZMQ_SUB_HOST:       "localhost"
+      ZMQ_SUB_PORT:       "5555"
+      ZMQ_TOPIC:          "detections"
+      HTTP_PORT:          "8080"
+      FRAME_JPEG_QUALITY: "75"
+      MAX_STREAM_FPS:     "35"
+      LOG_LEVEL:          "INFO"
+    ports:
+      - "8080:8080"
+    depends_on:
+      - object-detection-custom-camera-capture

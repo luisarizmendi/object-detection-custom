@@ -1,0 +1,23 @@
+FROM python:3.11-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libgl1 libglib2.0-0 \
+        v4l-utils \
+        ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir opencv-python-headless
+
+WORKDIR /app
+COPY capture.py shm_frame.py ./
+
+RUN mkdir -p /videos
+
+ENV CAM_TARGET_FPS=15
+ENV DEVICE_PROBE_TIMEOUT=5
+ENV VID_DIR=/videos
+ENV SHM_FRAME_NAME=camera_frame
+ENV VIEWER_JPEG_QUALITY=0
+ENV LOG_LEVEL=INFO
+
+CMD ["python3", "-u", "capture.py"]

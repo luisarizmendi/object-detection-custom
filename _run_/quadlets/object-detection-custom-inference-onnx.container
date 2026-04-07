@@ -1,0 +1,48 @@
+# ~/.config/containers/systemd/object-detection-custom-inference-onnx.container
+#
+# Bundled model: yolo11n.onnx (downloaded at image build time).
+# Override by mounting your own .onnx file and setting INFERENCE_MODEL.
+
+[Unit]
+Description=ONNX Inference — SHM frames → ZeroMQ detections (CPU or CUDA EP)
+After=object-detection-custom-camera-capture.service
+Requires=object-detection-custom-camera-capture.service
+
+[Container]
+Image=quay.io/luisarizmendi/object-detection-custom-inference-onnx:latest
+ContainerName=object-detection-custom-inference-onnx
+
+Volume=/dev/shm:/dev/shm
+# Override bundled model:
+# Volume=/path/to/my_model.onnx:/opt/models/my_model.onnx:ro
+# Volume=/path/to/classes.txt:/opt/models/classes.txt:ro
+
+Network=host
+SecurityLabelDisable=true
+
+# Uncomment for NVIDIA GPU via CDI:
+# AddDevice=nvidia.com/gpu=all
+
+Environment=SHM_FRAME_NAME=camera_frame
+Environment=ZMQ_PUB_PORT=5555
+Environment=ZMQ_TOPIC=detections
+Environment=INFERENCE_MODEL=yolo11n.onnx
+Environment=MODELS_DIR=/opt/models
+Environment=INFERENCE_WIDTH=640
+Environment=INFERENCE_HEIGHT=640
+Environment=CONFIDENCE_THRESH=0.4
+Environment=NMS_THRESH=0.45
+Environment=TARGET_FPS=15
+Environment=EXECUTION_PROVIDER=auto
+Environment=LOG_LEVEL=INFO
+
+# Optional class names override:
+# Environment=CLASS_NAMES=person,bicycle,car,motorcycle,bus,truck
+# Environment=CLASS_NAMES_FILE=/opt/models/classes.txt
+
+[Service]
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=default.target

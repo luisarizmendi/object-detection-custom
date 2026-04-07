@@ -1,0 +1,38 @@
+# inference-tensorrt-jetson — NVIDIA Jetson (JetPack 6.x, aarch64 only)
+#
+# Uses the L4T TensorRT runtime base which includes CUDA, cuDNN, and TensorRT
+# pre-built for Jetson's Tegra SoC. Do NOT use this image on x86_64 or
+# generic ARM64 systems — use the inference-tensorrt image instead.
+#
+# Build:
+#   podman build -t inference-tensorrt-jetson:latest .
+#
+# Dependencies:
+#   cuda-python  — official NVIDIA replacement for pycuda; compatible with
+#                  NumPy 2.x and TensorRT 10.x  (pycuda is NOT installed)
+#   numpy<2      — pin; older TRT bases ship numpy 1.x and mixing causes crashes
+
+FROM nvcr.io/nvidia/l4t-tensorrt:r10.3.0-runtime
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        python3-pip python3-dev \
+        libgl1 libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+# cuda-python must be <13: the 13.x series split the package and changed
+# the import API ("from cuda import cudart" requires the 12.x single-package
+# layout). The l4t-tensorrt:r10.3.0 base ships CUDA 12.x, so this pin is
+# also the correct version match.
+RUN pip3 install --no-cache-dir \
+        "numpy<2" \
+        opencv-python-headless \
+        pyzmq \
+        "cuda-python>=12.4,<13" \
+        onnxruntime
+
+WORKDIR /app
+COPY inference.py shm_frame.py ./
+
+RUN mkdir -p /opt/models
+
+CMD ["python3", "-u", "inference.py"]
