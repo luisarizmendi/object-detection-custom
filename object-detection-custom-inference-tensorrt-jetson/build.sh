@@ -42,12 +42,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 IMAGE_NAME="$(basename "$SCRIPT_DIR")"
 
 # --- Detect host architecture ---
-ARCH=$(uname -m)
-case "$ARCH" in
-  x86_64)  HOST_ARCH="amd64" ;;
-  aarch64) HOST_ARCH="arm64" ;;
-  *) echo "Unsupported architecture: $ARCH"; exit 1 ;;
-esac
+### force arm64
+HOST_ARCH="arm64" 
 
 cd "$SCRIPT_DIR/src"
 
