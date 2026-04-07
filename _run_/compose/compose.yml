@@ -60,8 +60,8 @@ services:
       # Video file fallback — used automatically when no camera is detected:
       - ../../videos:/videos:ro
     devices:
-      - /dev/video3
-      # - /dev/video1
+      - /dev/video1
+      # - /dev/video0
     group_add:
       - video
     security_opt:

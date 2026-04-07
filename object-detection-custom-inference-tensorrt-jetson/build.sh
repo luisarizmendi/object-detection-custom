@@ -42,26 +42,16 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 IMAGE_NAME="$(basename "$SCRIPT_DIR")"
 
 # --- Detect host architecture ---
-ARCH=$(uname -m)
-case "$ARCH" in
-  x86_64)  HOST_ARCH="amd64" ;;
-  aarch64) HOST_ARCH="arm64" ;;
-  *) echo "Unsupported architecture: $ARCH"; exit 1 ;;
-esac
+ARCH=arm64
+HOST_ARCH="arm64"
+
 
 # --- Restrict to ARM64 only ---
 REQUIRED_ARCH="arm64"
 
-if [[ "$HOST_ARCH" != "$REQUIRED_ARCH" ]]; then
-  echo "⛔ This image supports only ${REQUIRED_ARCH}. Current host: ${HOST_ARCH}"
-  exit 0
-fi
+echo "⚠️ This image supports only ${REQUIRED_ARCH}. ⚠️"
 
-# --- Disable cross-build for this image ---
-if [[ "$CROSS_BUILD" == true ]]; then
-  echo "⛔ Cross-build is disabled for this ARM-only image"
-  exit 0
-fi
+
 
 cd "$SCRIPT_DIR/src"
 
@@ -123,7 +113,7 @@ push_manifest() {
       if [[ "$already_built" == false ]]; then
         local arch_tag="${REGISTRY}/${IMAGE_NAME}:${arch}"
         echo "  → Pulling existing ${arch} image from registry: ${arch_tag}"
-        if podman pull --platform "linux/${arch}" "${arch_tag}" 2>/dev/null; then
+        if podman pull --platform "linux/${arch}" "${arch_tag}" 2>/dev/null || false; then
           echo "  → Adding pulled ${arch} to manifest"
           podman manifest add "$manifest" "$arch_tag"
         else
