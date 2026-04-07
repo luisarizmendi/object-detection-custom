@@ -6,9 +6,6 @@ REGISTRY="quay.io/luisarizmendi"
 CROSS_BUILD=false
 PUSH=true
 FORCE_MANIFEST_RESET=false
-CHUNK_SIZE="5242880"   # 5 MiB — avoids 413 on registries with upload size limits
-PUSH_RETRY=3
-PUSH_RETRY_DELAY="5s"
 
 # --- Parse args ---
 FORWARD_ARGS=()
@@ -32,14 +29,6 @@ while [[ $# -gt 0 ]]; do
     --force-manifest-reset)
       FORCE_MANIFEST_RESET=true
       shift
-      ;;
-    --chunk-size)
-      CHUNK_SIZE="$2"
-      shift 2
-      ;;
-    --push-retry)
-      PUSH_RETRY="$2"
-      shift 2
       ;;
     *)
       echo "Unknown option: $1"
@@ -68,8 +57,6 @@ echo "Host arch: ${HOST_ARCH}"
 echo "Cross build: ${CROSS_BUILD}"
 echo "Push: ${PUSH}"
 echo "Force manifest reset: ${FORCE_MANIFEST_RESET}"
-echo "Chunk size: ${CHUNK_SIZE} bytes"
-echo "Push retry: ${PUSH_RETRY}x (delay: ${PUSH_RETRY_DELAY})"
 echo "========================================"
 echo ""
 
@@ -177,21 +164,18 @@ if [[ "$PUSH" == true ]]; then
   echo ""
   echo "→ Pushing arch-specific images..."
   for img in "${BUILT_IMAGES[@]}"; do
-    podman push --retry "${PUSH_RETRY}" --retry-delay "${PUSH_RETRY_DELAY}" \
-      --chunk-size "${CHUNK_SIZE}" "$img"
+    podman push "$img"
   done
 
   echo ""
   echo "→ Building and pushing manifest: prod"
   push_manifest "$MANIFEST_PROD"
-  podman manifest push --rm --retry "${PUSH_RETRY}" --retry-delay "${PUSH_RETRY_DELAY}" \
-    --chunk-size "${CHUNK_SIZE}" "$MANIFEST_PROD"
+  podman manifest push --rm "$MANIFEST_PROD"
 
   echo ""
   echo "→ Building and pushing manifest: latest"
   push_manifest "$MANIFEST_LATEST"
-  podman manifest push --rm --retry "${PUSH_RETRY}" --retry-delay "${PUSH_RETRY_DELAY}" \
-    --chunk-size "${CHUNK_SIZE}" "$MANIFEST_LATEST"
+  podman manifest push --rm "$MANIFEST_LATEST"
 
   echo ""
   echo "✅ Done."
