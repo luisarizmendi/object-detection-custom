@@ -106,14 +106,12 @@ service's image. `build-all.sh` at the project root orchestrates all of them.
 **Default behaviour: build host arch only, no push (local images).**
 
 ```bash
-# Build all services locally (no push)
+# Build all services locally
 ./build-all.sh
 
-# Build + push all services (arch tags + latest/prod multi-arch manifests)
-./build-all.sh --push
 
 # Build both amd64 and arm64, then push
-./build-all.sh --cross --push
+./build-all.sh --cross
 
 # Skip both TensorRT images
 ./build-all.sh --skip-tensorrt
@@ -125,7 +123,7 @@ service's image. `build-all.sh` at the project root orchestrates all of them.
 ./build-all.sh --no-jetson
 
 # Custom registry and stable manifest tag
-./build-all.sh --push --registry quay.io/myorg --prod-tag v1.2
+./build-all.sh --registry quay.io/myorg --prod-tag v1.2
 ```
 
 ### How multi-arch manifests work
@@ -137,11 +135,6 @@ the script pulls the other arch tag from the registry so the manifest
 stays multi-arch. Use `--force-manifest-reset` to start the manifest
 from scratch instead.
 
-### Why there is no build.sh in the project root
-
-`build.sh` derives the image name from the directory it lives in. A
-root-level copy would produce an image named `object-detection-custom` which is
-meaningless. Use `build-all.sh` from the root instead.
 
 
 ## Quick start
@@ -152,8 +145,7 @@ meaningless. Use `build-all.sh` from the root instead.
 # 1. Copy your ONNX model
 cp my_model.onnx models/
 
-# 2. Build images
-./build-all.sh --skip-tensorrt   # faster if you don't need TensorRT
+# 2. Build images or pull them from registry
 
 # 3. Check which video device to pass (see Diagnostics)
 #    Then edit _run_/compose/compose.yml → object-detection-custom-camera-capture → devices:
@@ -166,12 +158,9 @@ podman compose --profile onnx up -d
 firefox http://localhost:8080
 ```
 
-### TensorRT — desktop/server GPU (x86_64 or generic arm64)
+### Run TensorRT — desktop/server GPU (x86_64 or generic arm64)
 
 ```bash
-cp my_model.onnx models/
-./build-all.sh --no-jetson        # builds object-detection-custom-camera-capture, onnx, viewer, tensorrt
-
 cd _run_/compose
 podman compose --profile tensorrt up -d
 
@@ -179,12 +168,9 @@ podman logs -f object-detection-custom-inference-tensorrt  # first run builds en
 firefox http://localhost:8080
 ```
 
-### TensorRT — Jetson (JetPack 6.x, aarch64)
+### Run TensorRT — Jetson (JetPack 6.x, aarch64)
 
 ```bash
-cp my_model.onnx models/
-./build-all.sh --jetson-only      # builds object-detection-custom-camera-capture, onnx, viewer, tensorrt-jetson
-
 cd _run_/compose
 podman compose --profile tensorrt-jetson up -d
 

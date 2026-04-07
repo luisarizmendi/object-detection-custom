@@ -1,15 +1,3 @@
-# object-detection-custom-inference-onnx — runs on CPU or NVIDIA GPU via ONNX Runtime CUDA EP
-#
-# For Jetson (aarch64) with GPU:
-#   Build on device or use a Jetson-compatible base image with CUDA.
-#
-# For CPU-only (x86_64 or aarch64 without GPU):
-#   docker buildx build --platform linux/amd64 -t object-detection-custom-inference-onnx:cpu .
-#
-# For NVIDIA GPU (x86_64):
-#   docker build --build-arg BASE=nvcr.io/nvidia/cuda:12.4.1-cudnn-runtime-ubi9 -t object-detection-custom-inference-onnx:cuda .
-
-#ARG BASE=python:3.11-slim
 ARG BASE=nvcr.io/nvidia/cuda:12.4.1-cudnn-runtime-ubi9
 FROM ${BASE}
 
@@ -20,14 +8,18 @@ RUN dnf install -y \
         glib2 \
     && dnf clean all
 
-# Optional but recommended: ensure pip is up to date
 RUN python3 -m pip install --upgrade pip
 
-# Install ONNX Runtime — CPU build (works everywhere)
-# For CUDA EP on x86, replace with: onnxruntime-gpu
-#ARG ONNXRUNTIME_PKG=onnxruntime
-ARG ONNXRUNTIME_PKG=onnxruntime-gpu
-RUN pip install --no-cache-dir \
+
+#####
+##### No package for gpu in aarch64
+#####
+RUN if [ "$(uname -m)" = "aarch64" ]; then \
+        ONNXRUNTIME_PKG=onnxruntime; \
+    else \
+        ONNXRUNTIME_PKG=onnxruntime-gpu; \
+    fi && \
+    pip install --no-cache-dir \
         ${ONNXRUNTIME_PKG} \
         opencv-python-headless \
         pyzmq \
@@ -36,9 +28,7 @@ RUN pip install --no-cache-dir \
 WORKDIR /app
 COPY inference.py shm_frame.py ./
 
-# Model directory (mount your .onnx here)
 RUN mkdir -p /opt/models
-#Default model
 COPY yolo26n.onnx /opt/models/model.onnx
 
 CMD ["python3", "-u", "inference.py"]
