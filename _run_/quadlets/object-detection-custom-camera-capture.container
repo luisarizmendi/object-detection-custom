@@ -29,7 +29,7 @@ Network=host
 SecurityLabelDisable=true
 
 # Environment
-Environment=CAM_TARGET_FPS=15
+Environment=CAM_TARGET_FPS=30
 Environment=DEVICE_PROBE_TIMEOUT=5
 Environment=VID_DIR=/videos
 Environment=SHM_FRAME_NAME=camera_frame
@@ -38,7 +38,7 @@ Environment=LOG_LEVEL=INFO
 
 # Overrides (uncomment to use):
 # Environment=CAMERA_DEVICE=/dev/video0
-# Environment=CAM_FRAMERATE=15
+# Environment=CAM_FRAMERATE=30
 # Environment=CAM_RESOLUTION=1280x720
 # Environment=CAM_FORMAT=MJPG
 

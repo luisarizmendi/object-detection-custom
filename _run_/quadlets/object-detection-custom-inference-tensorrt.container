@@ -38,7 +38,7 @@ Environment=INFERENCE_WIDTH=640
 Environment=INFERENCE_HEIGHT=640
 Environment=CONFIDENCE_THRESH=0.4
 Environment=NMS_THRESH=0.45
-Environment=TARGET_FPS=15
+Environment=TARGET_FPS=30
 Environment=TRT_FP16=1
 Environment=LOG_LEVEL=INFO
 
