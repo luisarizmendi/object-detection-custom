@@ -42,8 +42,26 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 IMAGE_NAME="$(basename "$SCRIPT_DIR")"
 
 # --- Detect host architecture ---
-### force arm64
-HOST_ARCH="arm64" 
+ARCH=$(uname -m)
+case "$ARCH" in
+  x86_64)  HOST_ARCH="amd64" ;;
+  aarch64) HOST_ARCH="arm64" ;;
+  *) echo "Unsupported architecture: $ARCH"; exit 1 ;;
+esac
+
+# --- Restrict to ARM64 only ---
+REQUIRED_ARCH="arm64"
+
+if [[ "$HOST_ARCH" != "$REQUIRED_ARCH" ]]; then
+  echo "⛔ This image supports only ${REQUIRED_ARCH}. Current host: ${HOST_ARCH}"
+  exit 0
+fi
+
+# --- Disable cross-build for this image ---
+if [[ "$CROSS_BUILD" == true ]]; then
+  echo "⛔ Cross-build is disabled for this ARM-only image"
+  exit 0
+fi
 
 cd "$SCRIPT_DIR/src"
 
@@ -63,13 +81,9 @@ build_image() {
   local arch=$1
   local tag="${REGISTRY}/${IMAGE_NAME}:${arch}"
 
-  # Remove any stale local image/manifest-list under this tag before building.
-  # A previous run (or a pull) may have left a corrupted manifest-list entry
-  # in local storage; podman build will fail trying to overwrite it.
-  # "manifest rm" handles the manifest-list case; "rmi --force" handles a
-  # plain image; both are silenced — it's fine if neither exists yet.
+  # Clean possible stale local state
   podman manifest rm "$tag" 2>/dev/null || true
-  podman rmi --force  "$tag" 2>/dev/null || true
+  podman rmi --force "$tag" 2>/dev/null || true
 
   echo "→ Building for $arch..."
   podman build --platform "linux/${arch}" -t "$tag" .
@@ -77,14 +91,6 @@ build_image() {
 }
 
 build_image "$HOST_ARCH"
-
-if [[ "$CROSS_BUILD" == true ]]; then
-  if [[ "$HOST_ARCH" == "amd64" ]]; then
-    build_image "arm64"
-  elif [[ "$HOST_ARCH" == "arm64" ]]; then
-    build_image "amd64"
-  fi
-fi
 
 # --- Manifest names ---
 MANIFEST_PROD="${REGISTRY}/${IMAGE_NAME}:prod"
@@ -99,24 +105,15 @@ done
 # --- All known architectures ---
 ALL_ARCHES=("amd64" "arm64")
 
-# ---------------------------------------------------------------------------
-# push_manifest <manifest_tag>
-#
-# 1. Push the freshly built arch-specific images to the registry.
-# 2. For every arch we did NOT build, try to pull its arch-specific tag from
-#    the registry (e.g. :arm64). If it exists, it goes into the manifest too.
-# 3. Create a fresh local manifest, add everything, push.
-# ---------------------------------------------------------------------------
+# --- Manifest builder ---
 push_manifest() {
   local manifest=$1
 
-  # Clean up any stale local manifest
-  podman manifest rm  "$manifest" 2>/dev/null || true
-  podman rmi --force  "$manifest" 2>/dev/null || true
+  podman manifest rm "$manifest" 2>/dev/null || true
+  podman rmi --force "$manifest" 2>/dev/null || true
   podman manifest create "$manifest"
 
   if [[ "$FORCE_MANIFEST_RESET" == false ]]; then
-    # Pull arch-specific images we did NOT build this run
     for arch in "${ALL_ARCHES[@]}"; do
       local already_built=false
       for built_arch in "${BUILT_ARCHES[@]}"; do
@@ -136,7 +133,6 @@ push_manifest() {
     done
   fi
 
-  # Add the freshly built images
   for img in "${BUILT_IMAGES[@]}"; do
     local arch
     arch=$(basename "$img" | sed 's/.*://')
@@ -166,12 +162,12 @@ if [[ "$PUSH" == true ]]; then
   echo ""
   echo "→ Building and pushing manifest: prod"
   push_manifest "$MANIFEST_PROD"
-  podman manifest push --rm "$MANIFEST_PROD"
+  podman manifest push "$MANIFEST_PROD"
 
   echo ""
   echo "→ Building and pushing manifest: latest"
   push_manifest "$MANIFEST_LATEST"
-  podman manifest push --rm "$MANIFEST_LATEST"
+  podman manifest push "$MANIFEST_LATEST"
 
   echo ""
   echo "✅ Done."

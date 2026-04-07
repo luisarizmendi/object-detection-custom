@@ -170,12 +170,12 @@ if [[ "$PUSH" == true ]]; then
   echo ""
   echo "→ Building and pushing manifest: prod"
   push_manifest "$MANIFEST_PROD"
-  podman manifest push --rm "$MANIFEST_PROD"
+  podman manifest push "$MANIFEST_PROD"
 
   echo ""
   echo "→ Building and pushing manifest: latest"
   push_manifest "$MANIFEST_LATEST"
-  podman manifest push --rm "$MANIFEST_LATEST"
+  podman manifest push "$MANIFEST_LATEST"
 
   echo ""
   echo "✅ Done."
