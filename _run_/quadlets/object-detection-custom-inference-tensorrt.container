@@ -23,7 +23,7 @@ ContainerName=object-detection-custom-inference-tensorrt
 
 Volume=/dev/shm:/dev/shm
 # Persist the built .engine across restarts (write access required):
-Volume=/opt/camera-inference/models:/opt/models
+Volume=/opt/object-detection-custom/models:/opt/models
 
 AddDevice=nvidia.com/gpu=all
 Network=host

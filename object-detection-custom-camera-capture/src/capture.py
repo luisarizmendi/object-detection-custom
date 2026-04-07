@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-camera-capture — USB camera (or video file fallback) → shared memory
+object-detection-custom-camera-capture — USB camera (or video file fallback) → shared memory
 =====================================================================
 
 Logic ported from the original camera-gateway-rtsp/stream.py:
@@ -521,7 +521,7 @@ def stream_videos_timed(writer: ShmFrameWriter, max_seconds: float = 0) -> None:
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main():
-    log.info("camera-capture starting (target_fps=%d)", CAM_TARGET_FPS)
+    log.info("object-detection-custom-camera-capture starting (target_fps=%d)", CAM_TARGET_FPS)
     writer = ShmFrameWriter()
     log.info("SHM writer ready: %s", writer._path)
 

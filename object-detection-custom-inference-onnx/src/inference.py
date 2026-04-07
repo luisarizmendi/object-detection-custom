@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-inference-onnx — Shared-memory frame → ONNX Runtime → ZeroMQ detections
+object-detection-custom-inference-onnx — Shared-memory frame → ONNX Runtime → ZeroMQ detections
 =========================================================================
 
-Reads raw frames from shared memory written by camera-capture, runs YOLO
+Reads raw frames from shared memory written by object-detection-custom-camera-capture, runs YOLO
 inference via ONNX Runtime (CPU or CUDA EP), and publishes detection results
 as JSON over ZeroMQ PUB.
 
@@ -386,7 +386,7 @@ def postprocess(
 def main():
     import onnxruntime as ort
 
-    log.info("inference-onnx starting")
+    log.info("object-detection-custom-inference-onnx starting")
     log.info("onnxruntime version: %s", ort.__version__)
 
     model_path    = resolve_model_path()

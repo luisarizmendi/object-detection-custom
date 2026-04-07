@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-stream-viewer backend — SHM frames + ZMQ detections → browser via WebSocket
+object-detection-custom-stream-viewer backend — SHM frames + ZMQ detections → browser via WebSocket
 ============================================================================
 
 Single WebSocket connection per client.  The server pushes two message types:
@@ -240,7 +240,7 @@ async def index_handler(request):
     index      = static_dir / "index.html"
     if index.exists():
         return web.FileResponse(index)
-    return web.Response(text="stream-viewer: index.html not found", status=404)
+    return web.Response(text="object-detection-custom-stream-viewer: index.html not found", status=404)
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -264,7 +264,7 @@ async def main_async():
     await runner.setup()
     site = web.TCPSite(runner, "0.0.0.0", HTTP_PORT)
     await site.start()
-    log.info("stream-viewer listening on http://0.0.0.0:%d", HTTP_PORT)
+    log.info("object-detection-custom-stream-viewer listening on http://0.0.0.0:%d", HTTP_PORT)
 
     while True:
         await asyncio.sleep(3600)

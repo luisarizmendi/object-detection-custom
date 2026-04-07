@@ -1,11 +1,11 @@
-# inference-tensorrt-jetson — NVIDIA Jetson (JetPack 6.x, aarch64 only)
+# object-detection-custom-inference-tensorrt-jetson — NVIDIA Jetson (JetPack 6.x, aarch64 only)
 #
 # Uses the L4T TensorRT runtime base which includes CUDA, cuDNN, and TensorRT
 # pre-built for Jetson's Tegra SoC. Do NOT use this image on x86_64 or
-# generic ARM64 systems — use the inference-tensorrt image instead.
+# generic ARM64 systems — use the object-detection-custom-inference-tensorrt image instead.
 #
 # Build:
-#   podman build -t inference-tensorrt-jetson:latest .
+#   podman build -t object-detection-custom-inference-tensorrt-jetson:latest .
 #
 # Dependencies:
 #   cuda-python  — official NVIDIA replacement for pycuda; compatible with

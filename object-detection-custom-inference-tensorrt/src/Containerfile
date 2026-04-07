@@ -1,14 +1,14 @@
-# inference-tensorrt — desktop/server GPU (x86_64) or generic ARM64
+# object-detection-custom-inference-tensorrt — desktop/server GPU (x86_64) or generic ARM64
 #
 # Uses the NVIDIA TensorRT container from NGC, which supports x86_64 natively
 # and arm64 (non-Jetson, e.g. Graviton or Ampere-based servers).
-# For Jetson (JetPack), use the inference-tensorrt-jetson image instead.
+# For Jetson (JetPack), use the object-detection-custom-inference-tensorrt-jetson image instead.
 #
 # Build for x86_64 (default):
-#   podman build -t inference-tensorrt:latest .
+#   podman build -t object-detection-custom-inference-tensorrt:latest .
 #
 # Build for generic arm64:
-#   podman build --platform linux/arm64 -t inference-tensorrt:latest .
+#   podman build --platform linux/arm64 -t object-detection-custom-inference-tensorrt:latest .
 #
 # Dependencies:
 #   cuda-python  — official NVIDIA replacement for pycuda; compatible with

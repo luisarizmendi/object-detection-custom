@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-inference-tensorrt — Shared memory → TensorRT → ZeroMQ detections
+object-detection-custom-inference-tensorrt — Shared memory → TensorRT → ZeroMQ detections
 ==================================================================
 
-Alternative to inference-onnx for NVIDIA Jetson or desktop GPU.
+Alternative to object-detection-custom-inference-onnx for NVIDIA Jetson or desktop GPU.
 Uses the TensorRT Python bindings (TRT 10.x API) to run a TRT engine, or
 builds one from an ONNX model on first run.
 
-Publishes the same JSON schema as inference-onnx so the viewer and
+Publishes the same JSON schema as object-detection-custom-inference-onnx so the viewer and
 downstream consumers are fully interchangeable.
 
 GPU memory management uses the official `cuda-python` package (replaces the
@@ -426,7 +426,7 @@ def build_engine_from_onnx(onnx_path: str) -> str:
 
 def main():
     import tensorrt as trt
-    log.info("inference-tensorrt starting")
+    log.info("object-detection-custom-inference-tensorrt starting")
     log.info("TensorRT version: %s", trt.__version__)
 
     # ── Resolve model paths ──────────────────────────────────────────────────

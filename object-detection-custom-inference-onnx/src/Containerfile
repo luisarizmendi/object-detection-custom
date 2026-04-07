@@ -1,13 +1,13 @@
-# inference-onnx — runs on CPU or NVIDIA GPU via ONNX Runtime CUDA EP
+# object-detection-custom-inference-onnx — runs on CPU or NVIDIA GPU via ONNX Runtime CUDA EP
 #
 # For Jetson (aarch64) with GPU:
 #   Build on device or use a Jetson-compatible base image with CUDA.
 #
 # For CPU-only (x86_64 or aarch64 without GPU):
-#   docker buildx build --platform linux/amd64 -t inference-onnx:cpu .
+#   docker buildx build --platform linux/amd64 -t object-detection-custom-inference-onnx:cpu .
 #
 # For NVIDIA GPU (x86_64):
-#   docker build --build-arg BASE=nvcr.io/nvidia/cuda:12.4.1-cudnn-runtime-ubi9 -t inference-onnx:cuda .
+#   docker build --build-arg BASE=nvcr.io/nvidia/cuda:12.4.1-cudnn-runtime-ubi9 -t object-detection-custom-inference-onnx:cuda .
 
 #ARG BASE=python:3.11-slim
 ARG BASE=nvcr.io/nvidia/cuda:12.4.1-cudnn-runtime-ubi9
