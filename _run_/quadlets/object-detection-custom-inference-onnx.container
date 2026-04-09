@@ -11,6 +11,7 @@ Requires=object-detection-custom-camera-capture.service
 [Container]
 Image=quay.io/luisarizmendi/object-detection-custom-inference-onnx:latest
 ContainerName=object-detection-custom-inference-onnx
+PullPolicy=missing
 
 Volume=/dev/shm:/dev/shm
 # Override bundled model:

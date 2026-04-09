@@ -20,6 +20,7 @@ Requires=object-detection-custom-camera-capture.service
 [Container]
 Image=quay.io/luisarizmendi/object-detection-custom-inference-tensorrt:latest
 ContainerName=object-detection-custom-inference-tensorrt
+PullPolicy=missing
 
 Volume=/dev/shm:/dev/shm
 # Persist the built .engine across restarts (write access required):
