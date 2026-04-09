@@ -1,6 +1,7 @@
 
 models/**
 !models/README.md
+!models/yolo26n.onnx
 #videos/**
 !videos/README.md
 
