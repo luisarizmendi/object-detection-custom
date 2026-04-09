@@ -347,6 +347,8 @@ def open_capture(device: str, params: dict) -> "cv2.VideoCapture | None":
     # Minimal internal buffer → always freshest frame
     cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
+    time.sleep(5)
+
     ok, _ = cap.read()
     if not ok:
         log.warning("First frame read failed on %s", device)

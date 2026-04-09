@@ -29,6 +29,5 @@ WORKDIR /app
 COPY inference.py shm_frame.py ./
 
 RUN mkdir -p /opt/models
-COPY yolo26n.onnx /opt/models/model.onnx
 
 CMD ["python3", "-u", "inference.py"]

@@ -195,22 +195,29 @@ A demo clip is included at `videos/demo.mp4`.
 
 ### Podman Quadlets (systemd)
 
+> NOTE: Run from a non-root user
+
 ```bash
 mkdir -p ~/.config/containers/systemd
 cp _run_/quadlets/object-detection-custom-camera-capture.container ~/.config/containers/systemd/
 cp _run_/quadlets/object-detection-custom-stream-viewer.container  ~/.config/containers/systemd/
 
 # Pick ONE inference quadlet:
-cp _run_/quadlets/object-detection-custom-inference-onnx.container              ~/.config/containers/systemd/
-# or:
-cp _run_/quadlets/object-detection-custom-inference-tensorrt.container          ~/.config/containers/systemd/
-# or:
 cp _run_/quadlets/object-detection-custom-inference-tensorrt-jetson.container   ~/.config/containers/systemd/
+# or:
+#cp _run_/quadlets/object-detection-custom-inference-onnx.container              ~/.config/containers/systemd/
+# or:
+#cp _run_/quadlets/object-detection-custom-inference-tensorrt.container          ~/.config/containers/systemd/
+
 
 systemctl --user daemon-reload
-systemctl --user start object-detection-custom-camera-capture
-systemctl --user start object-detection-custom-inference-onnx        # or whichever you copied
-systemctl --user start object-detection-custom-stream-viewer
+systemctl --user start object-detection-custom-camera-capture.service
+systemctl --user start object-detection-custom-inference-tensorrt-jetson.service
+# or:
+#systemctl --user start object-detection-custom-inference-onnx.service
+# or:
+#systemctl --user start object-detection-custom-inference-tensorrt.service
+systemctl --user start object-detection-custom-stream-viewer.service
 ```
 
 
