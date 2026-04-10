@@ -61,9 +61,9 @@ services:
       - ../../videos:/videos:ro
     devices:
       - /dev/video0
-      - /dev/video1
+      #- /dev/video1
     group_add:
-      - video
+      - keep-groups
     security_opt:
       - label=disable
     environment:
@@ -72,7 +72,7 @@ services:
       # CAM_FRAMERATE:  ""             # override detected fps
       # CAM_RESOLUTION: "1280x720"     # override resolution
       # CAM_FORMAT: ""                 # force MJPG or YUYV
-      DEVICE_PROBE_TIMEOUT: "5"
+      DEVICE_PROBE_TIMEOUT: "15"
       VID_DIR: "/videos"
       SHM_FRAME_NAME: "camera_frame"
       VIEWER_JPEG_QUALITY: "80"
