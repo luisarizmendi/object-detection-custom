@@ -303,25 +303,45 @@ function getLayout(fw, fh) {
 new ResizeObserver(() => { lastLayout = null; }).observe(wrap);
 
 // ── Frame rendering ─────────────────────────────────────────────────────────
-function drawFrame(blob) {
-  const url = URL.createObjectURL(new Blob([blob], {type: 'image/jpeg'}));
-  const img  = new Image();
-  img.onload = () => {
-    const l = getLayout(img.naturalWidth, img.naturalHeight);
-    vidCtx.clearRect(0, 0, l.cw, l.ch);
-    vidCtx.drawImage(img, l.ox, l.oy, l.dw, l.dh);
-    URL.revokeObjectURL(url);
+let pendingDecode = false;   // true while a frame is being decoded
+let latestBlob    = null;    // holds the most recent un-decoded frame
 
-    displayFrames++;
-    const now = performance.now();
-    if (now - fpsTs >= 1000) {
-      displayFps = displayFrames / ((now - fpsTs) / 1000);
-      displayFrames = 0;
-      fpsTs = now;
-    }
-    drawOverlay();
-  };
-  img.src = url;
+function drawFrame(buffer) {
+  // Always keep only the newest raw frame
+  latestBlob = buffer;
+  if (pendingDecode) return;   // decoder is busy — drop, will pick up latestBlob when free
+  decodeNext();
+}
+
+function decodeNext() {
+  if (latestBlob === null) { pendingDecode = false; return; }
+
+  const buffer = latestBlob;
+  latestBlob   = null;          // consume it
+  pendingDecode = true;
+
+  const blob = new Blob([buffer], { type: 'image/jpeg' });
+
+  createImageBitmap(blob)        // no URL needed — decoded off-thread, GC'd automatically
+    .then(bitmap => {
+      const l = getLayout(bitmap.width, bitmap.height);
+      vidCtx.clearRect(0, 0, l.cw, l.ch);
+      vidCtx.drawImage(bitmap, l.ox, l.oy, l.dw, l.dh);
+      bitmap.close();            // explicitly free GPU/CPU memory immediately
+
+      displayFrames++;
+      const now = performance.now();
+      if (now - fpsTs >= 1000) {
+        displayFps = displayFrames / ((now - fpsTs) / 1000);
+        displayFrames = 0;
+        fpsTs = now;
+      }
+      drawOverlay();
+    })
+    .catch(() => { /* decode error — just skip this frame */ })
+    .finally(() => {
+      decodeNext();              // check if a newer frame arrived while we were busy
+    });
 }
 
 // ── Overlay ─────────────────────────────────────────────────────────────────
