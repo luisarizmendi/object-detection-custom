@@ -32,6 +32,14 @@ CPU / CUDA EP auto        x86_64 / generic arm64    Jetson (l4t, aarch64 only)
 > causes port conflicts and undefined detection output.
 
 
+
+## Bootc image
+
+You can find here a bootc image with this application embedded ready to be used in a Jetson Orin Nano:
+
+https://github.com/luisarizmendi/bootc-images/tree/main/rhel-jetson-object-detection
+
+
 ## Choosing an inference backend
 
 | Situation | Use |
