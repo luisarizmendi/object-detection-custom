@@ -303,39 +303,43 @@ function getLayout(fw, fh) {
 new ResizeObserver(() => { lastLayout = null; }).observe(wrap);
 
 // ── Frame rendering ─────────────────────────────────────────────────────────
-let pendingDecode = false;   // true while a frame is being decoded
-let latestBlob    = null;    // holds the most recent un-decoded frame
+// ── STRICT BACKPRESSURE PIPELINE ─────────────────────────────────────
 
 const img = new Image();
-let imgUrl = null;
-let decoding = false;
-let pendingBuffer = null;
+
+let processing = false;
+let latestFrame = null;
+let currentUrl = null;
 
 function drawFrame(buffer) {
-  pendingBuffer = buffer;
-  if (decoding) return;
-  processFrame();
+  // Always overwrite → we only keep the newest frame
+  latestFrame = buffer;
+
+  // If already decoding → DO NOTHING (drop frame)
+  if (processing) return;
+
+  processNextFrame();
 }
 
-function processFrame() {
-  if (!pendingBuffer) {
-    decoding = false;
+function processNextFrame() {
+  if (!latestFrame) {
+    processing = false;
     return;
   }
 
-  decoding = true;
+  processing = true;
 
-  const buffer = pendingBuffer;
-  pendingBuffer = null;
+  const buffer = latestFrame;
+  latestFrame = null;
 
-  // release previous URL
-  if (imgUrl) {
-    URL.revokeObjectURL(imgUrl);
-    imgUrl = null;
+  // Cleanup previous URL (important)
+  if (currentUrl) {
+    URL.revokeObjectURL(currentUrl);
+    currentUrl = null;
   }
 
   const blob = new Blob([buffer], { type: 'image/jpeg' });
-  imgUrl = URL.createObjectURL(blob);
+  currentUrl = URL.createObjectURL(blob);
 
   img.onload = () => {
     const l = getLayout(img.width, img.height);
@@ -343,24 +347,28 @@ function processFrame() {
     vidCtx.clearRect(0, 0, l.cw, l.ch);
     vidCtx.drawImage(img, l.ox, l.oy, l.dw, l.dh);
 
-    displayFrames++;
-    const now = performance.now();
-    if (now - fpsTs >= 1000) {
-      displayFps = displayFrames / ((now - fpsTs) / 1000);
-      displayFrames = 0;
-      fpsTs = now;
+    // 🔥 Critical: free memory immediately
+    URL.revokeObjectURL(currentUrl);
+    currentUrl = null;
+
+    processing = false;
+
+    // If a newer frame arrived while we were busy → process it now
+    if (latestFrame) {
+      processNextFrame();
     }
-
-    drawOverlay();
-
-    // 🔥 VERY important: free memory immediately
-    URL.revokeObjectURL(imgUrl);
-    imgUrl = null;
-
-    processFrame();  // process next pending frame
   };
 
-  img.src = imgUrl;
+  img.onerror = () => {
+    // Also release on error
+    if (currentUrl) {
+      URL.revokeObjectURL(currentUrl);
+      currentUrl = null;
+    }
+    processing = false;
+  };
+
+  img.src = currentUrl;
 }
 
 // ── Overlay ─────────────────────────────────────────────────────────────────
