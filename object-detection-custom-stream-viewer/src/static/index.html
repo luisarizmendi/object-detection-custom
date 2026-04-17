@@ -306,42 +306,61 @@ new ResizeObserver(() => { lastLayout = null; }).observe(wrap);
 let pendingDecode = false;   // true while a frame is being decoded
 let latestBlob    = null;    // holds the most recent un-decoded frame
 
+const img = new Image();
+let imgUrl = null;
+let decoding = false;
+let pendingBuffer = null;
+
 function drawFrame(buffer) {
-  // Always keep only the newest raw frame
-  latestBlob = buffer;
-  if (pendingDecode) return;   // decoder is busy — drop, will pick up latestBlob when free
-  decodeNext();
+  pendingBuffer = buffer;
+  if (decoding) return;
+  processFrame();
 }
 
-function decodeNext() {
-  if (latestBlob === null) { pendingDecode = false; return; }
+function processFrame() {
+  if (!pendingBuffer) {
+    decoding = false;
+    return;
+  }
 
-  const buffer = latestBlob;
-  latestBlob   = null;          // consume it
-  pendingDecode = true;
+  decoding = true;
+
+  const buffer = pendingBuffer;
+  pendingBuffer = null;
+
+  // release previous URL
+  if (imgUrl) {
+    URL.revokeObjectURL(imgUrl);
+    imgUrl = null;
+  }
 
   const blob = new Blob([buffer], { type: 'image/jpeg' });
+  imgUrl = URL.createObjectURL(blob);
 
-  createImageBitmap(blob)        // no URL needed — decoded off-thread, GC'd automatically
-    .then(bitmap => {
-      const l = getLayout(bitmap.width, bitmap.height);
-      vidCtx.clearRect(0, 0, l.cw, l.ch);
-      vidCtx.drawImage(bitmap, l.ox, l.oy, l.dw, l.dh);
-      bitmap.close();            // explicitly free GPU/CPU memory immediately
+  img.onload = () => {
+    const l = getLayout(img.width, img.height);
 
-      displayFrames++;
-      const now = performance.now();
-      if (now - fpsTs >= 1000) {
-        displayFps = displayFrames / ((now - fpsTs) / 1000);
-        displayFrames = 0;
-        fpsTs = now;
-      }
-      drawOverlay();
-    })
-    .catch(() => { /* decode error — just skip this frame */ })
-    .finally(() => {
-      decodeNext();              // check if a newer frame arrived while we were busy
-    });
+    vidCtx.clearRect(0, 0, l.cw, l.ch);
+    vidCtx.drawImage(img, l.ox, l.oy, l.dw, l.dh);
+
+    displayFrames++;
+    const now = performance.now();
+    if (now - fpsTs >= 1000) {
+      displayFps = displayFrames / ((now - fpsTs) / 1000);
+      displayFrames = 0;
+      fpsTs = now;
+    }
+
+    drawOverlay();
+
+    // 🔥 VERY important: free memory immediately
+    URL.revokeObjectURL(imgUrl);
+    imgUrl = null;
+
+    processFrame();  // process next pending frame
+  };
+
+  img.src = imgUrl;
 }
 
 // ── Overlay ─────────────────────────────────────────────────────────────────
