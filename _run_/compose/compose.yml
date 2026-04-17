@@ -101,6 +101,8 @@ services:
       - /dev/shm:/dev/shm
       # Override bundled model:
       - ../../models:/opt/models:ro
+    group_add:
+      - keep-groups
     security_opt:
       - label=disable
     # Expose GPU via CDI — works on Jetson and desktop NVIDIA:
@@ -140,6 +142,8 @@ services:
       - /dev/shm:/dev/shm
       # Persist the .engine file (avoids ~5 min rebuild on every restart):
       - ../../models:/opt/models
+    group_add:
+      - keep-groups
     security_opt:
       - label=disable
     devices:
@@ -177,6 +181,8 @@ services:
       - /dev/shm:/dev/shm
       # Persist the .engine file (avoids ~5 min rebuild on every restart):
       - ../../models:/opt/models
+    group_add:
+      - keep-groups
     security_opt:
       - label=disable
     devices:
