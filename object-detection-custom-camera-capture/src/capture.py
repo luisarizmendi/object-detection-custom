@@ -315,10 +315,20 @@ def find_working_camera() -> "tuple[str, dict] | tuple[None, None]":
 # ── OpenCV capture loop ───────────────────────────────────────────────────────
 
 def open_capture(device: str, params: dict) -> "cv2.VideoCapture | None":
-    """Open the camera via OpenCV CAP_V4L2 using the probed parameters."""
-    cap = cv2.VideoCapture(device, cv2.CAP_V4L2)
+    """Open the camera via OpenCV CAP_V4L2 using the probed parameters.
+
+    This OpenCV build cannot open V4L2 devices by string path — it requires
+    an integer index. Extract it from /dev/videoN.
+    """
+    try:
+        dev_index = int(device.replace("/dev/video", ""))
+    except ValueError:
+        log.warning("Cannot extract index from device path '%s', falling back to 0", device)
+        dev_index = 0
+
+    cap = cv2.VideoCapture(dev_index, cv2.CAP_V4L2)
     if not cap.isOpened():
-        log.warning("cv2 could not open %s with CAP_V4L2", device)
+        log.warning("cv2 could not open %s (index %d) with CAP_V4L2", device, dev_index)
         return None
 
     # Pixel format
