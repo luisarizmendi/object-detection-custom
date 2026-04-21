@@ -15,13 +15,14 @@ After=network.target
 [Container]
 Image=quay.io/luisarizmendi/object-detection-custom-camera-capture:latest
 ContainerName=object-detection-custom-camera-capture
-PullPolicy=missing
 
-GroupAdd=video
+# 39 is the video group id. If id is different in your system change it here.
+UserNS=keep-id:uid=1000,gid=39
+PodmanArgs=--group-add=keep-groups
 
 Volume=/dev/shm:/dev/shm
 # Uncomment to enable video file fallback:
-# Volume=/path/to/videos:/videos:ro
+Volume=/var/home/detector/videos:/videos:ro
 
 # Pass all video devices so auto-detection works.
 # Restrict to a specific device if preferred.
@@ -33,7 +34,7 @@ SecurityLabelDisable=true
 
 # Environment
 Environment=CAM_TARGET_FPS=30
-Environment=DEVICE_PROBE_TIMEOUT=5
+Environment=DEVICE_PROBE_TIMEOUT=15
 Environment=VID_DIR=/videos
 Environment=SHM_FRAME_NAME=camera_frame
 Environment=VIEWER_JPEG_QUALITY=80
