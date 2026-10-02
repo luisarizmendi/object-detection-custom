@@ -147,6 +147,11 @@ from scratch instead.
 
 ## Quick start
 
+> NOTE: If you plan to use NVIDIA GPU be sure that you generated the CDI: `sudo nvidia-ctk cdi generate --mode=csv --output=/etc/cdi/nvidia.yaml`
+
+> NOTE: If you generated the CDI and you find a `unresolvable CDI devices nvidia.com/gpu=all` error try to update `podman` to the latest release (you might use `brew install podman` if you are running an old OS)
+
+
 ### ONNX (GPU-first, CPU fallback)
 
 ```bash
