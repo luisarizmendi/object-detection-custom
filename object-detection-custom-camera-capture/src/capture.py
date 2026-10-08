@@ -33,6 +33,12 @@ VERBOSE_STATS        Log periodic fps/resolution/payload stats (default: 0 — o
                      Set to "1" to enable. Useful for debugging; noisy in production.
 CAMERA_RETRY_INTERVAL  Seconds between camera re-probe attempts when the device is
                      present but failing, before falling back to video (default: 15)
+EXIT_ON_HOST_CAMERA  Set to "1" to exit the process when a camera is present on the
+                     host (seen through /sys) but there is no usable /dev/video* node
+                     inside the container. This happens when the camera is replugged
+                     (stale device node) or plugged in after the container started.
+                     Run the container with a restart policy so it comes back with
+                     the current device (default: 0 — off)
 """
 
 import glob
@@ -62,6 +68,8 @@ LOG_LEVEL            = os.environ.get("LOG_LEVEL", "INFO").upper()
 VERBOSE_STATS        = os.environ.get("VERBOSE_STATS", "0").strip() in ("1", "true", "yes")
 # How long to wait before re-probing a camera that failed, or re-trying after video fallback (s)
 CAMERA_RETRY_INTERVAL = int(os.environ.get("CAMERA_RETRY_INTERVAL", "15"))
+# Exit when the host has a camera that this container cannot use (needs a restart policy)
+EXIT_ON_HOST_CAMERA  = os.environ.get("EXIT_ON_HOST_CAMERA", "0").strip() in ("1", "true", "yes")
 # ─────────────────────────────────────────────────────────────────────────────
 
 logging.basicConfig(
@@ -290,6 +298,44 @@ def probe_device_ffmpeg(device: str, chosen: "dict | None") -> "dict | None":
     return None
 
 
+def host_camera_present() -> bool:
+    """True if the host has a V4L2 capture node, seen through /sys.
+
+    /sys is the host's sysfs, so this works even when the container has no
+    matching /dev node. index 0 is the capture node (index 1 is usually
+    the metadata node of a UVC camera).
+    """
+    for p in glob.glob("/sys/class/video4linux/video*"):
+        try:
+            with open(p + "/index") as f:
+                if f.read().strip() == "0":
+                    return True
+        except OSError:
+            pass
+    return False
+
+
+def is_stale_node(dev: str) -> bool:
+    """True if dev is a node the host already removed (link count 0)."""
+    try:
+        return os.stat(dev).st_nlink == 0
+    except OSError:
+        return False
+
+
+def usable_nodes() -> list:
+    """Video nodes in this container that still exist and are readable."""
+    devices = [CAMERA_DEVICE] if CAMERA_DEVICE else sorted(glob.glob("/dev/video*"))
+    ok = []
+    for d in devices:
+        try:
+            if os.stat(d).st_nlink > 0 and os.access(d, os.R_OK):
+                ok.append(d)
+        except OSError:
+            pass
+    return ok
+
+
 def find_working_camera() -> "tuple[str, dict] | tuple[None, None]":
     """Try each /dev/video* and return the first (device, params) that works."""
     devices = [CAMERA_DEVICE] if CAMERA_DEVICE else sorted(glob.glob("/dev/video*"))
@@ -298,6 +344,11 @@ def find_working_camera() -> "tuple[str, dict] | tuple[None, None]":
         return None, None
 
     for dev in devices:
+        if is_stale_node(dev):
+            log.warning("%s is a stale device node (removed on the host). "
+                        "The container must be restarted to see the new device.",
+                        dev)
+            continue
         if not os.access(dev, os.R_OK):
             log.warning("%s not readable — add --device %s and --group-add video",
                         dev, dev)
@@ -550,6 +601,18 @@ def main():
             time.sleep(2)
         else:
             consecutive_failures += 1
+
+            # A camera exists on the host but this container has no usable node
+            # for it (replugged = stale node, or plugged in after the container
+            # started). The container's /dev is fixed at start, so the only fix
+            # is a restart. A restart policy (Restart=always) brings us back
+            # with the current device.
+            if EXIT_ON_HOST_CAMERA and host_camera_present() and not usable_nodes():
+                log.error("Camera is present on the host but not usable in this "
+                          "container. Exiting so the container restarts with the "
+                          "new device.")
+                sys.exit(1)
+
             # If a specific device was requested (CAMERA_DEVICE set) or we have
             # previously seen the device work, keep retrying so that a camera
             # reconnect or a brief driver hiccup is recovered automatically.
