@@ -323,6 +323,7 @@ With `VERBOSE_STATS=1` you'll see lines like:
 | `VIEWER_JPEG_QUALITY` | 0 | JPEG quality in SHM (0 = raw BGR) |
 | `VERBOSE_STATS` | 0 | Set to `1` to log periodic fps/payload stats |
 | `LOG_LEVEL` | INFO | DEBUG / INFO / WARNING |
+| `EXIT_ON_HOST_CAMERA` | 0 | Set to `1` to exit when a camera is not usable |
 
 ### object-detection-custom-inference-onnx / object-detection-custom-inference-tensorrt / object-detection-custom-inference-tensorrt-jetson
 | Variable | Default | Description |

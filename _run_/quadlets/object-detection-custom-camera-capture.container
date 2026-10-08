@@ -16,7 +16,6 @@ After=network.target
 Image=quay.io/luisarizmendi/object-detection-custom-camera-capture:latest
 ContainerName=object-detection-custom-camera-capture
 
-# 39 is the video group id. If id is different in your system change it here.
 UserNS=keep-id:uid=1000,gid=39
 PodmanArgs=--group-add=keep-groups
 
@@ -26,8 +25,9 @@ Volume=/var/home/detector/videos:/videos:ro
 
 # Pass all video devices so auto-detection works.
 # Restrict to a specific device if preferred.
-AddDevice=/dev/video0
-# AddDevice=/dev/video1
+# Hypen included to make the container run even if the device is missing
+AddDevice=-/dev/video0
+# AddDevice=-/dev/video1
 
 Network=host
 SecurityLabelDisable=true
@@ -39,6 +39,7 @@ Environment=VID_DIR=/videos
 Environment=SHM_FRAME_NAME=camera_frame
 Environment=VIEWER_JPEG_QUALITY=80
 Environment=LOG_LEVEL=INFO
+Environment=EXIT_ON_HOST_CAMERA=1
 
 # Overrides (uncomment to use):
 # Environment=CAMERA_DEVICE=/dev/video0
@@ -49,6 +50,7 @@ Environment=LOG_LEVEL=INFO
 [Service]
 Restart=always
 RestartSec=3
+ExecStartPre=-/usr/bin/systemctl --user daemon-reload
 
 [Install]
 WantedBy=default.target
