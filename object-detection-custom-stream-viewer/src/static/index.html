@@ -108,6 +108,24 @@ canvas{position:absolute;top:0;left:0;width:100%;height:100%;display:block}
   display:flex;flex-direction:column;gap:4px;
   max-height:300px;overflow-y:auto
 }
+.det-head{display:flex;align-items:center;justify-content:space-between}
+.json-toggle{
+  display:flex;align-items:center;gap:5px;cursor:pointer;
+  text-transform:none;letter-spacing:0;font-size:.72rem;
+  font-weight:400;color:var(--rh-gray-300)
+}
+.det-summary{
+  margin-bottom:8px;padding-bottom:7px;
+  border-bottom:1px solid var(--rh-gray-700)
+}
+.det-summary:empty{display:none}
+.det-sum-row{
+  display:flex;align-items:center;gap:6px;
+  font-size:.77rem;padding:1px 0;color:var(--rh-gray-300)
+}
+.det-sum-dot{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+.det-sum-name{font-weight:700;color:var(--rh-white)}
+.det-sum-count{font-variant-numeric:tabular-nums;font-weight:600;color:var(--rh-gray-100)}
 .det-item{
   background:var(--rh-gray-800);border-radius:4px;
   padding:6px 8px;font-size:.74rem;
@@ -197,15 +215,6 @@ input[type=checkbox]{accent-color:var(--rh-red)}
         <span class="stat-val" id="sSource">—</span></div>
     </div>
 
-    <!-- Detections -->
-    <div class="card">
-      <h2>Detections &nbsp;<span id="detCount"
-        style="color:var(--rh-gray-500);font-weight:400">0</span></h2>
-      <div class="det-list" id="detList">
-        <div class="no-det">Waiting for inference…</div>
-      </div>
-    </div>
-
     <!-- Display settings -->
     <div class="card">
       <h2>Display Settings</h2>
@@ -224,16 +233,27 @@ input[type=checkbox]{accent-color:var(--rh-red)}
         <input type="range" id="cfgFont" min="8" max="24" value="13">
         <span class="cfg-val" id="cfgFontVal">13</span>
       </div>
-      <div class="cfg-row">
-        <label>Show JSON</label>
-        <input type="checkbox" id="cfgJson">
-      </div>
     </div>
 
     <!-- Raw JSON (hidden by default) -->
     <div class="card" id="cardJson" style="display:none">
       <h2>Last Detection JSON</h2>
       <div class="json-box" id="jsonBox"></div>
+    </div>
+
+    <!-- Detections -->
+    <div class="card">
+      <h2 class="det-head">
+        <span>Detections &nbsp;<span id="detCount"
+          style="color:var(--rh-gray-500);font-weight:400">0</span></span>
+        <label class="json-toggle">Show JSON
+          <input type="checkbox" id="cfgJson">
+        </label>
+      </h2>
+      <div class="det-summary" id="detSummary"></div>
+      <div class="det-list" id="detList">
+        <div class="no-det">Waiting for inference…</div>
+      </div>
     </div>
 
   </div><!-- /sidebar -->
@@ -471,12 +491,24 @@ function updateSidebar(payload) {
     src.includes('onnx')   ? 'ONNX Runtime' : '—';
 
   const list = document.getElementById('detList');
+  const summary = document.getElementById('detSummary');
   const visible = payload.detections.filter(d => d.confidence >= confThresh);
 
   if (visible.length === 0) {
+    summary.innerHTML = '';
     list.innerHTML = '<div class="no-det">No detections</div>';
     return;
   }
+
+  // Count per object type (insertion order = first seen in this frame)
+  const counts = {};
+  for (const d of visible) counts[d.class_name] = (counts[d.class_name] || 0) + 1;
+  summary.innerHTML = Object.entries(counts).map(([name, n]) =>
+    `<div class="det-sum-row">
+      <span class="det-sum-dot" style="background:${classColor(name)}"></span>
+      <span class="det-sum-name">${name}:</span>
+      <span class="det-sum-count">${n}</span>
+    </div>`).join('');
 
   list.innerHTML = visible.map(d => {
     const col = classColor(d.class_name);
