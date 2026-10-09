@@ -32,11 +32,15 @@ CONFIDENCE_THRESH   Min confidence              (default: 0.4)
 NMS_THRESH          NMS IoU threshold           (default: 0.45)  [classic only]
 TARGET_FPS          Max inference FPS           (default: 30)
 TRT_FP16            Use FP16 precision          (default: 1)
+TRT_WORKSPACE_MB    Builder workspace limit, MB (default: 1024)
+TRT_BUILD_RETRIES   Engine build attempts       (default: 3)
+TRT_OPT_LEVEL       Builder optimization level 0-5 (optional, lower = less memory/time)
 CLASS_NAMES         Comma-separated names (optional, overrides ONNX metadata)
 CLASS_NAMES_FILE    Path to names file (optional)
 LOG_LEVEL           DEBUG / INFO / WARNING      (default: INFO)
 """
 
+import gc
 import json
 import logging
 import os
@@ -61,6 +65,9 @@ CONF_THRESH = float(os.environ.get("CONFIDENCE_THRESH", "0.4"))
 NMS_THRESH  = float(os.environ.get("NMS_THRESH",        "0.45"))
 TARGET_FPS  = float(os.environ.get("TARGET_FPS",        "30"))
 TRT_FP16    = os.environ.get("TRT_FP16", "1") == "1"
+TRT_WS_MB   = int(os.environ.get("TRT_WORKSPACE_MB", "1024"))
+TRT_RETRIES = int(os.environ.get("TRT_BUILD_RETRIES", "3"))
+TRT_OPT_LVL = os.environ.get("TRT_OPT_LEVEL", "").strip()
 LOG_LEVEL   = os.environ.get("LOG_LEVEL", "INFO").upper()
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -71,6 +78,20 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 INTERVAL = 1.0 / max(TARGET_FPS, 0.1)
+
+
+# ── Memory helpers ────────────────────────────────────────────────────────────
+
+def mem_available_mb() -> int:
+    """MemAvailable from /proc/meminfo. On Jetson the GPU shares this RAM."""
+    try:
+        with open("/proc/meminfo") as f:
+            for line in f:
+                if line.startswith("MemAvailable:"):
+                    return int(line.split()[1]) // 1024
+    except Exception:
+        pass
+    return -1
 
 
 # ── Class names ───────────────────────────────────────────────────────────────
@@ -93,8 +114,17 @@ def load_class_names(onnx_path: str = "") -> dict:
     if onnx_path and os.path.exists(onnx_path):
         try:
             import onnxruntime as ort
-            sess = ort.InferenceSession(onnx_path, providers=["CPUExecutionProvider"])
-            meta = sess.get_modelmeta().custom_metadata_map
+            # Keep this session as light as possible: on Jetson the RAM is
+            # shared with the GPU and the TRT build needs every free MB.
+            so = ort.SessionOptions()
+            so.graph_optimization_level = ort.GraphOptimizationLevel.ORT_DISABLE_ALL
+            so.enable_cpu_mem_arena = False
+            so.enable_mem_pattern = False
+            sess = ort.InferenceSession(onnx_path, sess_options=so,
+                                        providers=["CPUExecutionProvider"])
+            meta = dict(sess.get_modelmeta().custom_metadata_map)
+            del sess
+            gc.collect()
             if "names" in meta:
                 import ast
                 names_raw = ast.literal_eval(meta["names"])
@@ -382,22 +412,16 @@ class TRTEngine:
 
 # ── Engine builder ────────────────────────────────────────────────────────────
 
-def build_engine_from_onnx(onnx_path: str) -> str:
-    """Build (or return cached) TRT engine from an ONNX file."""
+def _try_build(onnx_path: str, workspace_mb: int):
+    """One build attempt. Returns serialized engine bytes or None."""
     import tensorrt as trt
 
-    engine_path = os.path.splitext(onnx_path)[0] + ".engine"
-    if os.path.exists(engine_path):
-        log.info("Using cached TRT engine: %s", engine_path)
-        return engine_path
-
-    log.info("Building TRT engine from %s (this may take several minutes) …", onnx_path)
     logger  = trt.Logger(trt.Logger.WARNING)
     builder = trt.Builder(logger)
     network = builder.create_network(
         1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)
     )
-    parser  = trt.OnnxParser(network, logger)
+    parser = trt.OnnxParser(network, logger)
 
     with open(onnx_path, "rb") as f:
         if not parser.parse(f.read()):
@@ -406,19 +430,69 @@ def build_engine_from_onnx(onnx_path: str) -> str:
             raise RuntimeError("Failed to parse ONNX model")
 
     config = builder.create_builder_config()
-    config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, 1 << 30)  # 1 GB
+    config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, workspace_mb << 20)
+
+    if TRT_OPT_LVL:
+        config.builder_optimization_level = int(TRT_OPT_LVL)
+        log.info("TRT builder optimization level: %s", TRT_OPT_LVL)
 
     if TRT_FP16 and builder.platform_has_fast_fp16:
         config.set_flag(trt.BuilderFlag.FP16)
         log.info("TRT FP16 enabled")
 
-    engine_bytes = builder.build_serialized_network(network, config)
-    if engine_bytes is None:
-        raise RuntimeError("TRT engine build failed — see warnings above")
+    try:
+        engine_bytes = builder.build_serialized_network(network, config)
+        # Copy out of TRT's buffer so everything TRT owns can be released
+        return bytes(engine_bytes) if engine_bytes is not None else None
+    finally:
+        del config, parser, network, builder
+        gc.collect()
 
-    with open(engine_path, "wb") as f:
+
+def build_engine_from_onnx(onnx_path: str) -> str:
+    """Build (or return cached) TRT engine from an ONNX file.
+
+    On Jetson the GPU shares RAM with the CPU, so the build can fail when the
+    free memory is low ("Device memory is insufficient to use tactic").
+    To be robust, a failed build is retried with a smaller workspace after
+    letting memory settle. The engine is written atomically so a partial
+    file is never mistaken for a valid cached engine.
+    """
+    engine_path = os.path.splitext(onnx_path)[0] + ".engine"
+    if os.path.exists(engine_path):
+        log.info("Using cached TRT engine: %s", engine_path)
+        return engine_path
+
+    log.info("Building TRT engine from %s (this may take several minutes) …", onnx_path)
+
+    workspace_mb = TRT_WS_MB
+    engine_bytes = None
+    for attempt in range(1, max(TRT_RETRIES, 1) + 1):
+        gc.collect()
+        log.info("TRT build attempt %d/%d  workspace=%d MB  MemAvailable=%d MB",
+                 attempt, TRT_RETRIES, workspace_mb, mem_available_mb())
+        engine_bytes = _try_build(onnx_path, workspace_mb)
+        if engine_bytes is not None:
+            break
+        log.warning("TRT build attempt %d failed (MemAvailable=%d MB)",
+                    attempt, mem_available_mb())
+        workspace_mb = max(256, workspace_mb // 2)
+        time.sleep(10)
+
+    if engine_bytes is None:
+        raise RuntimeError(
+            "TRT engine build failed — see warnings above. "
+            "If you see 'insufficient memory' messages, free RAM (stop other "
+            "containers, add swap) or build the engine once with trtexec."
+        )
+
+    tmp_path = engine_path + ".tmp"
+    with open(tmp_path, "wb") as f:
         f.write(engine_bytes)
-    log.info("TRT engine saved to %s", engine_path)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp_path, engine_path)
+    log.info("TRT engine saved to %s (%.1f MB)", engine_path, len(engine_bytes) / 1e6)
     return engine_path
 
 
